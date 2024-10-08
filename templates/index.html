@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Vulnerability Scanner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <script defer src="/static/js/app.js"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto py-10">
+        <div class="text-center mb-10">
+            <h1 class="text-4xl font-bold text-blue-600">Web Vulnerability Scanner</h1>
+            <p class="mt-4 text-gray-600">Enter a website URL to scan for common security vulnerabilities.</p>
+        </div>
+
+        <div class="w-full max-w-lg mx-auto bg-white shadow-md rounded-lg p-6">
+            <form id="scanForm" class="space-y-4">
+                <label class="block text-lg font-medium text-gray-700">Website URL:</label>
+                <input type="text" id="urlInput" class="block w-full border rounded-md p-2" placeholder="https://example.com" required>
+                <button type="submit" class="block w-full bg-blue-600 text-white py-2 rounded-md font-medium">Start Scan</button>
+            </form>
+        </div>
+
+        <div class="mt-10" id="status"></div>
+
+        <div id="resultsContainer" class="mt-10">
+            <!-- Vulnerability report will be injected here -->
+        </div>
+    </div>
+    <script>
+      const socket = io.connect();
+
+// Handle form submission and send the URL to the backend
+document.getElementById('scanForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const urlInput = document.getElementById('urlInput').value;
+    document.getElementById('status').innerHTML = `<p class="text-gray-600">Scanning ${urlInput}...</p>`;
+    document.getElementById('resultsContainer').innerHTML = ''; // Clear previous results
+    socket.emit('start_scan', { url: urlInput });
+});
+
+// Handle real-time status updates from the backend
+socket.on('status_update', function (message) {
+    document.getElementById('status').innerHTML = `<p class="text-blue-600">${message}</p>`;
+});
+
+// Handle real-time vulnerability reports
+socket.on('url_report', function (data) {
+    const { url, results } = data;
+    let reportHTML = `
+        <div class="bg-white shadow-md rounded-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold text-blue-600">Results for ${url}</h2>
+            <ul class="mt-4 space-y-2">
+    `;
+    results.forEach(result => {
+        const vulnStatus = result.vulnerable ? 'text-red-600' : 'text-green-600';
+        reportHTML += `
+            <li>
+                <h3 class="font-semibold text-lg">${result.description}</h3>
+                <p class="${vulnStatus}">${result.vulnerable ? 'Vulnerable' : 'Not Vulnerable'}</p>
+            </li>
+        `;
+    });
+    reportHTML += '</ul></div>';
+
+    // Append the report to the results container
+    document.getElementById('resultsContainer').insertAdjacentHTML('beforeend', reportHTML);
+});
+    </script>
+
+</body>
+</html>

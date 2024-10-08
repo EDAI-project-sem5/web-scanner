@@ -1,0 +1,17 @@
+/* Custom styles for your web app */
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+input:focus, button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #2563EB;
+}
+
+p.text-red-600 {
+  font-weight: bold;
+}
+
+p.text-green-600 {
+  font-weight: bold;
+}
