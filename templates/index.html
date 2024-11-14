@@ -6,8 +6,10 @@
     <title>Web Vulnerability Scanner</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script defer src="/static/js/app.js"></script>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-gray-100 text-gray-800">
 
@@ -30,46 +32,149 @@
         <div id="resultsContainer" class="mt-10">
             <!-- Vulnerability report will be injected here -->
         </div>
+
+        <div id="chartContainer" class="mt-10">
+            <canvas id="vulnerabilityChart"></canvas>
+        </div>
     </div>
     <script>
       const socket = io.connect();
 
-// Handle form submission and send the URL to the backend
-document.getElementById('scanForm').addEventListener('submit', function (e) {
-    e.preventDefault();
-    const urlInput = document.getElementById('urlInput').value;
-    document.getElementById('status').innerHTML = `<p class="text-gray-600">Scanning ${urlInput}...</p>`;
-    document.getElementById('resultsContainer').innerHTML = ''; // Clear previous results
-    socket.emit('start_scan', { url: urlInput });
-});
+      // Initialize an array to store all results
+      let allResults = [];
+      let vulnerabilityCounts = {
+          "SQL Injection": 0,
+          "Cross-Site Scripting (XSS)": 0,
+          "Command Injection": 0,
+          "Directory Traversal": 0,
+          "Open Redirect": 0,
+          "Sensitive Information Disclosure": 0,
+          "Cross-Site Request Forgery (CSRF)": 0,
+          "File Upload": 0,
+          "HTTP Headers": 0
+      };
 
-// Handle real-time status updates from the backend
-socket.on('status_update', function (message) {
-    document.getElementById('status').innerHTML = `<p class="text-blue-600">${message}</p>`;
-});
+      // Handle form submission and send the URL to the backend
+      document.getElementById('scanForm').addEventListener('submit', function (e) {
+          e.preventDefault();
+          const urlInput = document.getElementById('urlInput').value;
+          document.getElementById('status').innerHTML = `<p class="text-gray-600">Scanning ${urlInput}...</p>`;
+          document.getElementById('resultsContainer').innerHTML = ''; // Clear previous results
+          socket.emit('start_scan', { url: urlInput });
+      });
 
-// Handle real-time vulnerability reports
-socket.on('url_report', function (data) {
-    const { url, results } = data;
-    let reportHTML = `
-        <div class="bg-white shadow-md rounded-lg p-6 mb-6">
-            <h2 class="text-2xl font-bold text-blue-600">Results for ${url}</h2>
-            <ul class="mt-4 space-y-2">
-    `;
-    results.forEach(result => {
-        const vulnStatus = result.vulnerable ? 'text-red-600' : 'text-green-600';
-        reportHTML += `
-            <li>
-                <h3 class="font-semibold text-lg">${result.description}</h3>
-                <p class="${vulnStatus}">${result.vulnerable ? 'Vulnerable' : 'Not Vulnerable'}</p>
-            </li>
-        `;
-    });
-    reportHTML += '</ul></div>';
+      // Handle real-time status updates from the backend
+      socket.on('status_update', function (message) {
+          document.getElementById('status').innerHTML = `<p class="text-blue-600">${message}</p>`;
+      });
 
-    // Append the report to the results container
-    document.getElementById('resultsContainer').insertAdjacentHTML('beforeend', reportHTML);
-});
+      // Handle real-time vulnerability reports
+      socket.on('url_report', function (data) {
+          const { url, results } = data;
+          allResults.push({ url, results });
+
+          let reportHTML = `
+              <div class="bg-white shadow-md rounded-lg p-6 mb-6 w-1/2">
+                  <h2 class="text-xl font-bold text-blue-600">Results for <span class="text-pink-500">${url}</span></h2>
+                  <ul class="mt-4 space-y-2">
+          `;
+          results.forEach(result => {
+              const vulnStatus = result.vulnerable ? 'text-red-600' : 'text-green-600';
+              const iconClass = result.vulnerable ? 'fas fa-times' : 'fas fa-check';
+              reportHTML += `
+                  <li class="flex gap-4">
+                      <h3 class="${vulnStatus}"><i class="${iconClass}"></i></h3>
+                      <h3 class="font-semibold text-md">${result.description}</h3>
+                  </li>
+              `;
+              if (result.vulnerable) {
+                  vulnerabilityCounts[result.description]++;
+              }
+          });
+          reportHTML += '</ul></div>';
+
+          // Append the report to the results container
+          document.getElementById('resultsContainer').insertAdjacentHTML('beforeend', reportHTML);
+      });
+
+      // Function to generate the final report
+      function generateFinalReport() {
+          localStorage.setItem('vulnerabilityCounts', JSON.stringify(vulnerabilityCounts));
+          updateChart();
+          generateSummaryReport();
+      }
+
+      // Call generateFinalReport when the scan is complete
+      socket.on('scan_complete', function () {
+          generateFinalReport();
+      });
+
+      // Function to update the chart
+      function updateChart() {
+          const vulnerabilityCounts = JSON.parse(localStorage.getItem('vulnerabilityCounts'));
+
+          // Prepare the data for the chart
+          const data = {
+              labels: Object.keys(vulnerabilityCounts),
+              datasets: [{
+                  label: 'Number of Vulnerabilities',
+                  data: Object.values(vulnerabilityCounts),
+                  backgroundColor: [
+                      'rgba(255, 99, 132, 0.2)',
+                      'rgba(54, 162, 235, 0.2)',
+                      'rgba(255, 206, 86, 0.2)',
+                      'rgba(75, 192, 192, 0.2)',
+                      'rgba(153, 102, 255, 0.2)',
+                      'rgba(255, 159, 64, 0.2)',
+                      'rgba(199, 199, 199, 0.2)',
+                      'rgba(83, 102, 255, 0.2)',
+                      'rgba(255, 99, 132, 0.2)'
+                  ],
+                  borderColor: [
+                      'rgba(255, 99, 132, 1)',
+                      'rgba(54, 162, 235, 1)',
+                      'rgba(255, 206, 86, 1)',
+                      'rgba(75, 192, 192, 1)',
+                      'rgba(153, 102, 255, 1)',
+                      'rgba(255, 159, 64, 1)',
+                      'rgba(199, 199, 199, 1)',
+                      'rgba(83, 102, 255, 1)',
+                      'rgba(255, 99, 132, 1)'
+                  ],
+                  borderWidth: 1
+              }]
+          };
+
+          // Configuration for the chart
+          const config = {
+              type: 'bar',
+              data: data,
+              options: {
+                  scales: {
+                      y: {
+                          beginAtZero: true
+                      }
+                  }
+              }
+          };
+
+          // Render the chart
+          const ctx = document.getElementById('vulnerabilityChart').getContext('2d');
+          new Chart(ctx, config);
+      }
+
+      // Function to generate a summary report
+      function generateSummaryReport() {
+          const vulnerabilityCounts = JSON.parse(localStorage.getItem('vulnerabilityCounts'));
+          const summary = Object.entries(vulnerabilityCounts).map(([key, value]) => `${key}: ${value}`).join('\n');
+          const blob = new Blob([summary], { type: 'text/plain' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'vulnerability_summary.txt';
+          a.click();
+          URL.revokeObjectURL(url);
+      }
     </script>
 
 </body>
